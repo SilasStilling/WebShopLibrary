@@ -4,10 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System;
 using System.Data.SqlClient;
 using System.Security.Cryptography;
-using System.Threading.Tasks;
 using Konscious.Security.Cryptography;
 using WebShopLibrary.Database;
 
@@ -23,38 +21,37 @@ namespace WebShopLibrary
         }
 
         // Hashes password with Argon2
-        private string HashPassword(string password)
-        {
-            var salt = new byte[16]; // Generér en tilfældig salt
-            using (var rng = new System.Security.Cryptography.RNGCryptoServiceProvider())
-            {
-                rng.GetBytes(salt); // Fyld salt-arrayen med tilfældige bytes
-            }
 
-            // Brug Argon2 til at hashe passwordet med salt
+        // husk skal være private
+        public string HashPassword(string password)
+        {
+            var salt = new byte[16]; // Generate a random salt
+            RandomNumberGenerator.Fill(salt); // Fill salt array with random bytes
+
+            // Use Argon2 to hash the password with salt
             using (var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password)))
             {
                 argon2.Salt = salt;
-                argon2.DegreeOfParallelism = 8; // Antallet af CPU kerner (tilpas efter behov)
-                argon2.MemorySize = 65536; // Størrelsen af hukommelsen i kilobytes
-                argon2.Iterations = 4; // Antallet af iterationer
+                argon2.DegreeOfParallelism = 8; // Number of CPU cores (adjust as needed)
+                argon2.MemorySize = 65536; // Memory size in kilobytes
+                argon2.Iterations = 4; // Number of iterations
 
-                // Generer hash
-                var hash = argon2.GetBytes(32); // Generér hash på 32 bytes
+                // Generate hash
+                var hash = argon2.GetBytes(32); // Generate 32-byte hash
 
-                // Kombinér salt og hash til at gemme dem sammen i databasen
+                // Combine salt and hash to store them together in the database
                 byte[] hashBytes = new byte[salt.Length + hash.Length];
                 Buffer.BlockCopy(salt, 0, hashBytes, 0, salt.Length);
                 Buffer.BlockCopy(hash, 0, hashBytes, salt.Length, hash.Length);
 
-                return Convert.ToBase64String(hashBytes); // Returner som en Base64-streng
+                return Convert.ToBase64String(hashBytes); // Return as a Base64 string
             }
         }
 
         public async Task<bool> RegisterUser(string username, string password, string role)
         {
             // Check if the username already exists
-            var checkQuery = "SELECT COUNT(*) FROM users WHERE Username = @Username";
+            var checkQuery = "SELECT COUNT(*) FROM Users WHERE Username = @Username";
             var parameters = new[] { new SqlParameter("@Username", username) };
 
             var result = await _dConnection.ExecuteQueryAsync(checkQuery, parameters);
@@ -65,7 +62,7 @@ namespace WebShopLibrary
 
             // Hash the password and create the new user
             var hashedPassword = HashPassword(password);
-            var insertQuery = "INSERT INTO users (Username, PasswordHash, Role) VALUES (@Username, @PasswordHash, @Role)";
+            var insertQuery = "INSERT INTO Users (Username, PasswordHash, Role) VALUES (@Username, @PasswordHash, @Role)";
             var insertParams = new[]
             {
                 new SqlParameter("@Username", username),
@@ -79,7 +76,7 @@ namespace WebShopLibrary
 
         public async Task<User> Login(string username, string password)
         {
-            var query = "SELECT Id, Username, PasswordHash, Role FROM users WHERE Username = @Username";
+            var query = "SELECT Id, Username, PasswordHash, Role FROM Users WHERE Username = @Username";
             var parameters = new[] { new SqlParameter("@Username", username) };
 
             var result = await _dConnection.ExecuteQueryAsync(query, parameters);
@@ -88,10 +85,14 @@ namespace WebShopLibrary
                 throw new Exception("User not found.");
 
             var user = result.Rows[0];
-            var storedHashWithSalt = Convert.FromBase64String(user["PasswordHash"].ToString());
+            var passwordHashString = user["PasswordHash"].ToString();
+            if (passwordHashString == null)
+                throw new Exception("Password hash is null.");
+
+            var storedHashWithSalt = Convert.FromBase64String(passwordHashString);
 
             // Split salt and hash
-            var salt = new byte[16]; // Saltens længde
+            var salt = new byte[16]; // Salt length
             Buffer.BlockCopy(storedHashWithSalt, 0, salt, 0, salt.Length);
 
             var storedHash = new byte[storedHashWithSalt.Length - salt.Length];

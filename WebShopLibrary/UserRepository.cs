@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using WebShopLibrary.Database;
 using Microsoft.Data.SqlClient;
+using Konscious.Security.Cryptography;
+using System.Security.Cryptography;
 
 namespace WebShopLibrary
 {
@@ -17,7 +19,8 @@ namespace WebShopLibrary
         {
             _dbConnection = dbConnection;
         }
-        public IEnumerable<User> GetAll() 
+
+        public IEnumerable<User> GetAll()
         {
             var users = new List<User>();
             var connection = _dbConnection.GetConnection();
@@ -46,7 +49,8 @@ namespace WebShopLibrary
             }
             return users;
         }
-        public User? Get(int id) 
+
+        public User? Get(int id)
         {
             var connection = _dbConnection.GetConnection();
             var cmd = new SqlCommand("SELECT * FROM Users WHERE Id = @Id", connection);
@@ -73,15 +77,21 @@ namespace WebShopLibrary
             }
             return null;
         }
+
         public User? Add(User user)
         {
             user.Validate();
+
+            // Hash passwordet
+            var hashedPassword = HashPassword(user.Password);
+
             var connection = _dbConnection.GetConnection();
-            var cmd = new SqlCommand("INSERT INTO Users (Username, Email, Password, Role) VALUES (@Username, @Email, @Password, @Role); SELECT SCOPE_IDENTITY()", connection);
+            var cmd = new SqlCommand("INSERT INTO Users (Username, Email, PasswordHash, Role) VALUES (@Username, @Email, @Password, @Role); SELECT SCOPE_IDENTITY()", connection);
             cmd.Parameters.AddWithValue("@Username", user.Username);
             cmd.Parameters.AddWithValue("@Email", user.Email);
-            cmd.Parameters.AddWithValue("@Password", user.Password);
+            cmd.Parameters.AddWithValue("@Password", hashedPassword); // Brug det hashede password
             cmd.Parameters.AddWithValue("@Role", user.Role);
+
             try
             {
                 connection.Open();
@@ -93,6 +103,7 @@ namespace WebShopLibrary
                 connection.Close();
             }
         }
+
         public void Remove(int id)
         {
             var connection = _dbConnection.GetConnection();
@@ -108,5 +119,28 @@ namespace WebShopLibrary
                 connection.Close();
             }
         }
+
+        private string HashPassword(string password)
+        {
+            var salt = new byte[16];
+            RandomNumberGenerator.Fill(salt);
+
+            using (var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password)))
+            {
+                argon2.Salt = salt;
+                argon2.DegreeOfParallelism = 8;
+                argon2.MemorySize = 65536;
+                argon2.Iterations = 4;
+
+                var hash = argon2.GetBytes(32);
+
+                var hashBytes = new byte[salt.Length + hash.Length];
+                Buffer.BlockCopy(salt, 0, hashBytes, 0, salt.Length);
+                Buffer.BlockCopy(hash, 0, hashBytes, salt.Length, hash.Length);
+
+                return Convert.ToBase64String(hashBytes);
+            }
+        }
+
     }
 }
