@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using System.Net.Mail;
 
 namespace WebShopLibrary
 {
@@ -32,18 +33,40 @@ namespace WebShopLibrary
             }
 
         }
+        // Gammel ValidateEmail med brug af Regex
+        //public void ValidateEmail()
+        //{
+        //    if (string.IsNullOrEmpty(Email))
+        //    {
+        //        throw new ArgumentNullException("Email is required");
+        //    }
+        //    if (!Regex.IsMatch(Email, @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"))        // Regular expression for email validation
+        //    {
+        //        throw new ArgumentException("Email is not valid!");
+        //    }
+        //}
 
         public void ValidateEmail()
         {
-            if (Email == null)
+            if (string.IsNullOrEmpty(Email))
             {
-                throw new ArgumentNullException(nameof(Email), "Email cannot be null");
+                throw new ArgumentNullException(nameof(Email), "Email is required");
             }
-            if (Email.Length <= 2)
+
+            try
             {
-                throw new ArgumentOutOfRangeException("Email must be at least 2 characters long", nameof(Email));
+                var addr = new MailAddress(Email);
+                if (addr.Address != Email)
+                {
+                    throw new ArgumentException("Email is not valid!");
+                }
+            }
+            catch
+            {
+                throw new ArgumentException("Email is not valid!");
             }
         }
+
         public void ValidatePassword()
         {
             if (Password == null)
@@ -84,13 +107,6 @@ namespace WebShopLibrary
             }
         }
 
-        private bool ContainsDictionaryWord(string password)
-        {
-            // This is a placeholder for a method that checks if the password contains dictionary words.
-            // Implementing this method would require a list of dictionary words to check against.
-            // For simplicity, this example assumes such a method exists.
-            return false;
-        }
         public void Validate()
         {
             ValidateName();
