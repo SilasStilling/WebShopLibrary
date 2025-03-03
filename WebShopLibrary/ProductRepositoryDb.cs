@@ -36,7 +36,8 @@ namespace WebShopLibrary
                         Id = reader.GetInt32(0),
                         Name = reader.GetString(1),
                         Model = reader.GetString(2),
-                        Price = reader.GetDouble(3)
+                        Price = reader.GetDouble(3),
+                        Image = reader["Image"] as byte[]
                     };
                     products.Add(product);
                 }
@@ -63,7 +64,8 @@ namespace WebShopLibrary
                         Id = reader.GetInt32(0),
                         Name = reader.GetString(1),
                         Model = reader.GetString(2),
-                        Price = reader.GetDouble(3)
+                        Price = reader.GetDouble(3),
+                        Image = reader["Image"] as byte[]
                     };
                 }
             }
@@ -83,6 +85,7 @@ namespace WebShopLibrary
             cmd.Parameters.AddWithValue("@Name", product.Name);
             cmd.Parameters.AddWithValue("@Model", product.Model);
             cmd.Parameters.AddWithValue("@Price", product.Price);
+            cmd.Parameters.AddWithValue("@Image", product.Image);
             try
             {
                 connection.Open();
