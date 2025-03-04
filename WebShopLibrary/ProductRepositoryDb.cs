@@ -7,12 +7,14 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using WebShopLibrary.Database;
+using Microsoft.AspNetCore.Http;
+using System.IO;
+using Microsoft.AspNetCore.Http.Internal;
 
 namespace WebShopLibrary
 {
     public class ProductRepositoryDb
     {
-
         private readonly DBConnection _dbConnection;
         public ProductRepositoryDb(DBConnection dbConnection)
         {
@@ -23,24 +25,29 @@ namespace WebShopLibrary
         {
             var products = new List<Product>();
             var connection = _dbConnection.GetConnection();
-            var cmd = new SqlCommand("SELECT * FROM Products", connection);
+            var cmd = new SqlCommand("SELECT Id, Name, Model, Price, ImageData FROM Products", connection); // Corrected column name
 
             try
             {
                 connection.Open();
                 var reader = cmd.ExecuteReader();
+
                 while (reader.Read())
                 {
                     var product = new Product
                     {
                         Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        Model = reader.GetString(2),
+                        Name = reader.IsDBNull(1) ? null : reader.GetString(1),
+                        Model = reader.IsDBNull(2) ? null : reader.GetString(2),
                         Price = reader.GetDouble(3),
-                        Image = reader["Image"] as byte[]
+                        ImageData = reader.IsDBNull(4) ? null : (byte[])reader["ImageData"] // Now matches the updated schema
                     };
                     products.Add(product);
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Database error: {ex.Message}");
             }
             finally
             {
@@ -48,6 +55,8 @@ namespace WebShopLibrary
             }
             return products;
         }
+
+
         public Product? Get(int id)
         {
             var connection = _dbConnection.GetConnection();
@@ -65,7 +74,7 @@ namespace WebShopLibrary
                         Name = reader.GetString(1),
                         Model = reader.GetString(2),
                         Price = reader.GetDouble(3),
-                        Image = reader["Image"] as byte[]
+                        ImageData = reader.IsDBNull(4) ? null : (byte[])reader["ImageData"]
                     };
                 }
             }
@@ -81,11 +90,12 @@ namespace WebShopLibrary
             product.Validate();
             product.Id = 0;
             var connection = _dbConnection.GetConnection();
-            var cmd = new SqlCommand("INSERT INTO Products (Name, Model, Price) OUTPUT INSERTED.Id VALUES (@Name, @Model, @Price)", connection);
+            var cmd = new SqlCommand("INSERT INTO Products (Name, Model, Price, ImageData) OUTPUT INSERTED.Id VALUES (@Name, @Model, @Price, @ImageData)", connection);
             cmd.Parameters.AddWithValue("@Name", product.Name);
             cmd.Parameters.AddWithValue("@Model", product.Model);
             cmd.Parameters.AddWithValue("@Price", product.Price);
-            cmd.Parameters.AddWithValue("@Image", product.Image);
+            cmd.Parameters.AddWithValue("@ImageData", product.ImageData ?? (object)DBNull.Value); // Fjernet @Image
+
             try
             {
                 connection.Open();
@@ -97,6 +107,7 @@ namespace WebShopLibrary
             }
             return product;
         }
+
 
         public void Remove(int id)
         {
@@ -112,9 +123,21 @@ namespace WebShopLibrary
             {
                 connection.Close();
             }
-
         }
 
-    }
+        private byte[] ConvertToBytes(IFormFile formFile)
+        {
+            using (var memoryStream = new MemoryStream())
+            {
+                formFile.CopyTo(memoryStream);
+                return memoryStream.ToArray();
+            }
+        }
 
+        private IFormFile ConvertToFormFile(byte[] bytes, string fileName)
+        {
+            var stream = new MemoryStream(bytes);
+            return new FormFile(stream, 0, bytes.Length, fileName, fileName);
+        }
+    }
 }
