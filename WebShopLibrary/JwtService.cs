@@ -14,13 +14,13 @@ namespace WebShopLibrary
     {
         private readonly string _secretKey = "2XjMUiuCS6E06z!j679dGKIMRpK4wmqeL"; // Sørg for at holde denne sikker
 
-        public string GenerateToken(string username, string role)
+        public string GenerateToken(User user)
         {
             var claims = new[]
             {
-            new Claim(ClaimTypes.Name, username),
-            new Claim(ClaimTypes.Role, role)
-        };
+                    new Claim(ClaimTypes.Name, user.Username),
+                    new Claim(ClaimTypes.Role, user.Role)
+                };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
