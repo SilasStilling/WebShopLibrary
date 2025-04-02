@@ -104,6 +104,29 @@ namespace WebShopLibrary
             }
         }
 
+        public void Update(User user)
+        {
+            user.Validate();
+
+            var connection = _dbConnection.GetConnection();
+            var cmd = new SqlCommand("UPDATE Users SET Username = @Username, Email = @Email, PasswordHash = @Password, Role = @Role WHERE Id = @Id", connection);
+            cmd.Parameters.AddWithValue("@Id", user.Id);
+            cmd.Parameters.AddWithValue("@Username", user.Username);
+            cmd.Parameters.AddWithValue("@Email", user.Email);
+            cmd.Parameters.AddWithValue("@Password", user.Password);
+            cmd.Parameters.AddWithValue("@Role", user.Role);
+
+            try
+            {
+                connection.Open();
+                cmd.ExecuteNonQuery();
+            }
+            finally
+            {
+                connection.Close();
+            }
+        }
+
         public void Remove(int id)
         {
             var connection = _dbConnection.GetConnection();
