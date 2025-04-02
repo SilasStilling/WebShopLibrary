@@ -104,7 +104,7 @@ namespace WebShopLibrary
             }
         }
 
-        public void Update(User user)
+        public User Update(User user)
         {
             user.Validate();
 
@@ -120,6 +120,7 @@ namespace WebShopLibrary
             {
                 connection.Open();
                 cmd.ExecuteNonQuery();
+                return user;
             }
             finally
             {
