@@ -108,6 +108,28 @@ namespace WebShopLibrary
             return product;
         }
 
+        public Product Update(Product product) 
+        { 
+            product.Validate();
+            var connection = _dbConnection.GetConnection();
+            var cmd = new SqlCommand("UPDATE Products SET Name = @Name, Model = @Model, Price = @Price, ImageData = @ImageData WHERE Id = @Id", connection);
+            cmd.Parameters.AddWithValue("@Id", product.Id);
+            cmd.Parameters.AddWithValue("@Name", product.Name);
+            cmd.Parameters.AddWithValue("@Model", product.Model);
+            cmd.Parameters.AddWithValue("@Price", product.Price);
+            cmd.Parameters.AddWithValue("@ImageData", product.ImageData ?? (object)DBNull.Value);
+
+            try
+            {
+                connection.Open();
+                cmd.ExecuteNonQuery();
+            }
+            finally
+            {
+                connection.Close();
+            }
+            return product;
+        }
 
         public void Remove(int id)
         {
