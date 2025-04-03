@@ -14,6 +14,12 @@ namespace WebShopLibrary
     public class AuthService
     {
         private readonly DBConnection _dConnection;
+        
+        private static Dictionary<string, int> loginAttempts = new Dictionary<string, int>();
+        private static Dictionary<string, DateTime> lockoutTime = new Dictionary<string, DateTime>();
+        private const int maxAttempts = 5;
+        private const int lockoutDurationMinutes = 5; // Lås konto i 5 minutter
+
 
         public AuthService(DBConnection dbConnection)
         {
@@ -73,9 +79,14 @@ namespace WebShopLibrary
             await _dConnection.ExecuteNonQueryAsync(insertQuery, insertParams);
             return true;
         }
-
         public async Task<User> Login(string username, string password)
         {
+            // Tjek om brugeren er låst ude
+            if (lockoutTime.ContainsKey(username) && DateTime.Now < lockoutTime[username])
+            {
+                throw new Exception($"Account locked. Try again in {lockoutTime[username] - DateTime.Now:mm} minutes.");
+            }
+
             var query = "SELECT Id, Username, PasswordHash, Role FROM Users WHERE Username = @Username";
             var parameters = new[] { new SqlParameter("@Username", username) };
 
@@ -91,14 +102,13 @@ namespace WebShopLibrary
 
             var storedHashWithSalt = Convert.FromBase64String(passwordHashString);
 
-            // Split salt and hash
-            var salt = new byte[16]; // Salt length
+            // Split salt og hash
+            var salt = new byte[16];
             Buffer.BlockCopy(storedHashWithSalt, 0, salt, 0, salt.Length);
 
             var storedHash = new byte[storedHashWithSalt.Length - salt.Length];
             Buffer.BlockCopy(storedHashWithSalt, salt.Length, storedHash, 0, storedHash.Length);
 
-            // Hash the incoming password with the salt
             using (var argon2 = new Argon2id(Encoding.UTF8.GetBytes(password)))
             {
                 argon2.Salt = salt;
@@ -108,9 +118,25 @@ namespace WebShopLibrary
 
                 var passwordHash = argon2.GetBytes(32);
 
-                // Compare the generated hash with the stored hash
+                // Hvis adgangskoden er forkert
                 if (!passwordHash.SequenceEqual(storedHash))
-                    throw new Exception("Incorrect password.");
+                {
+                    if (!loginAttempts.ContainsKey(username))
+                        loginAttempts[username] = 0;
+
+                    loginAttempts[username]++;
+
+                    if (loginAttempts[username] >= maxAttempts)
+                    {
+                        lockoutTime[username] = DateTime.Now.AddMinutes(lockoutDurationMinutes);
+                        throw new Exception("Too many failed attempts. Your account is locked for 5 minutes.");
+                    }
+
+                    throw new Exception($"Incorrect password. {maxAttempts - loginAttempts[username]} attempts left.");
+                }
+
+                // Login er korrekt, nulstil fejlforsøg
+                loginAttempts[username] = 0;
 
                 return new User
                 {
@@ -120,5 +146,8 @@ namespace WebShopLibrary
                 };
             }
         }
+
+
+
     }
 }

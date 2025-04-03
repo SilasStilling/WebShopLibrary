@@ -16,6 +16,7 @@ namespace WebShopLibrary
         public string? Password { get; set; }
         public string? Role { get; set; }
 
+
         public override string ToString()
         {
             return $"User: {Username}, Email: {Email}";
