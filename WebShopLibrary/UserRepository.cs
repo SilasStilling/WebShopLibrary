@@ -53,7 +53,7 @@ namespace WebShopLibrary
         public User? Get(int id)
         {
             var connection = _dbConnection.GetConnection();
-            var cmd = new SqlCommand("SELECT * FROM Users WHERE Id = @Id", connection);
+            var cmd = new SqlCommand("SELECT Id, Username, Email, PasswordHash, Role FROM Users WHERE Id = @Id", connection);
             cmd.Parameters.AddWithValue("@Id", id);
             try
             {
@@ -82,6 +82,9 @@ namespace WebShopLibrary
         {
             user.Validate();
 
+            if (string.IsNullOrEmpty(user.Password))
+                throw new ArgumentException("Password cannot be null or empty");
+
             // Hash passwordet
             var hashedPassword = HashPassword(user.Password);
 
@@ -108,12 +111,17 @@ namespace WebShopLibrary
         {
             user.Validate();
 
+            if (string.IsNullOrEmpty(user.Password))
+                throw new ArgumentException("Password cannot be null or empty");
+
+            var hashedPassword = HashPassword(user.Password);
+
             var connection = _dbConnection.GetConnection();
             var cmd = new SqlCommand("UPDATE Users SET Username = @Username, Email = @Email, PasswordHash = @Password, Role = @Role WHERE Id = @Id", connection);
             cmd.Parameters.AddWithValue("@Id", user.Id);
             cmd.Parameters.AddWithValue("@Username", user.Username);
             cmd.Parameters.AddWithValue("@Email", user.Email);
-            cmd.Parameters.AddWithValue("@Password", user.Password);
+            cmd.Parameters.AddWithValue("@Password", hashedPassword);
             cmd.Parameters.AddWithValue("@Role", user.Role);
 
             try
@@ -144,7 +152,7 @@ namespace WebShopLibrary
             }
         }
 
-        private string HashPassword(string password)
+        public string HashPassword(string password)
         {
             var salt = new byte[16];
             RandomNumberGenerator.Fill(salt);
@@ -165,6 +173,5 @@ namespace WebShopLibrary
                 return Convert.ToBase64String(hashBytes);
             }
         }
-
     }
 }
