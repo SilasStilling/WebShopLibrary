@@ -14,16 +14,17 @@ namespace WebShopLibrary
     public class AuthService
     {
         private readonly DBConnection _dConnection;
-        
+        private readonly LogService _logService; // Tilføjet logservice
+
         private static Dictionary<string, int> loginAttempts = new Dictionary<string, int>();
         private static Dictionary<string, DateTime> lockoutTime = new Dictionary<string, DateTime>();
         private const int maxAttempts = 5;
         private const int lockoutDurationMinutes = 5; // Lås konto i 5 minutter
 
-
-        public AuthService(DBConnection dbConnection)
+        public AuthService(DBConnection dbConnection, LogService logService)
         {
             _dConnection = dbConnection;
+            _logService = logService;
         }
 
         // Hashes password with Argon2
@@ -79,11 +80,13 @@ namespace WebShopLibrary
             await _dConnection.ExecuteNonQueryAsync(insertQuery, insertParams);
             return true;
         }
+
         public async Task<User> Login(string username, string password)
         {
             // Tjek om brugeren er låst ude
             if (lockoutTime.ContainsKey(username) && DateTime.Now < lockoutTime[username])
             {
+                await _logService.LogAsync("Login", username, "Failed", "Account locked");
                 throw new Exception($"Account locked. Try again in {lockoutTime[username] - DateTime.Now:mm} minutes.");
             }
 
@@ -93,12 +96,18 @@ namespace WebShopLibrary
             var result = await _dConnection.ExecuteQueryAsync(query, parameters);
 
             if (result.Rows.Count == 0)
+            {
+                await _logService.LogAsync("Login", username, "Failed", "User not found");
                 throw new Exception("User not found.");
+            }
 
             var user = result.Rows[0];
             var passwordHashString = user["PasswordHash"].ToString();
             if (passwordHashString == null)
+            {
+                await _logService.LogAsync("Login", username, "Failed", "Password hash is null");
                 throw new Exception("Password hash is null.");
+            }
 
             var storedHashWithSalt = Convert.FromBase64String(passwordHashString);
 
@@ -129,14 +138,18 @@ namespace WebShopLibrary
                     if (loginAttempts[username] >= maxAttempts)
                     {
                         lockoutTime[username] = DateTime.Now.AddMinutes(lockoutDurationMinutes);
+                        await _logService.LogAsync("Login", username, "Failed", "Too many failed attempts");
                         throw new Exception("Too many failed attempts. Your account is locked for 5 minutes.");
                     }
 
+                    await _logService.LogAsync("Login", username, "Failed", "Incorrect password");
                     throw new Exception($"Incorrect password. {maxAttempts - loginAttempts[username]} attempts left.");
                 }
 
                 // Login er korrekt, nulstil fejlforsøg
                 loginAttempts[username] = 0;
+
+                await _logService.LogAsync("Login", username, "Success");
 
                 return new User
                 {
@@ -146,8 +159,5 @@ namespace WebShopLibrary
                 };
             }
         }
-
-
-
     }
 }
