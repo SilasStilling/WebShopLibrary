@@ -57,28 +57,38 @@ namespace WebShopLibrary
 
         public async Task<bool> RegisterUser(string username, string password, string role)
         {
-            // Check if the username already exists
-            var checkQuery = "SELECT COUNT(*) FROM Users WHERE Username = @Username";
-            var parameters = new[] { new SqlParameter("@Username", username) };
-
-            var result = await _dConnection.ExecuteQueryAsync(checkQuery, parameters);
-            if (result.Rows[0][0].ToString() != "0")
+            try
             {
-                throw new Exception("Username is already taken.");
+                // Check if the username already exists
+                var checkQuery = "SELECT COUNT(*) FROM Users WHERE Username = @Username";
+                var parameters = new[] { new SqlParameter("@Username", username) };
+
+                var result = await _dConnection.ExecuteQueryAsync(checkQuery, parameters);
+                if (result.Rows[0][0].ToString() != "0")
+                {
+                    await _logService.LogAsync("Register", username, "Failed", "Username already taken");
+                    throw new Exception("Username is already taken.");
+                }
+
+                // Hash the password and create the new user
+                var hashedPassword = HashPassword(password);
+                var insertQuery = "INSERT INTO Users (Username, PasswordHash, Role) VALUES (@Username, @PasswordHash, @Role)";
+                var insertParams = new[]
+                {
+                    new SqlParameter("@Username", username),
+                    new SqlParameter("@PasswordHash", hashedPassword),
+                    new SqlParameter("@Role", role)
+                };
+
+                await _dConnection.ExecuteNonQueryAsync(insertQuery, insertParams);
+                await _logService.LogAsync("Register", username, "Success");
+                return true;
             }
-
-            // Hash the password and create the new user
-            var hashedPassword = HashPassword(password);
-            var insertQuery = "INSERT INTO Users (Username, PasswordHash, Role) VALUES (@Username, @PasswordHash, @Role)";
-            var insertParams = new[]
+            catch (Exception ex)
             {
-                new SqlParameter("@Username", username),
-                new SqlParameter("@PasswordHash", hashedPassword),
-                new SqlParameter("@Role", role)
-            };
-
-            await _dConnection.ExecuteNonQueryAsync(insertQuery, insertParams);
-            return true;
+                await _logService.LogAsync("Register", username, "Failed", ex.Message);
+                throw;
+            }
         }
 
         public async Task<User> Login(string username, string password)
