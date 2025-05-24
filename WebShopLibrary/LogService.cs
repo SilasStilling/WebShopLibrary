@@ -45,6 +45,12 @@ namespace WebShopLibrary
             };
 
             var json = JsonSerializer.Serialize(log);
+
+            // Gem til fil
+            var logFilePath = @"C:\Logs\WebShopLogs\log.txt";
+            Directory.CreateDirectory(Path.GetDirectoryName(logFilePath)!);
+            await File.AppendAllTextAsync(logFilePath, json + Environment.NewLine);
+
             var hash = ComputeSha256Hash(json);
 
             var query = "INSERT INTO Logs (LogEntry, Hash) VALUES (@LogEntry, @Hash)";
